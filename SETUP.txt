@@ -1,0 +1,23 @@
+サブスク管理 PWA版
+
+中身
+- index.html：本体
+- manifest.json：ホーム画面アプリ用設定
+- service-worker.js：オフライン起動用
+- icon-192.png / icon-512.png / apple-touch-icon.png：ホーム画面アイコン
+
+今回の修正
+1. Koderのlocalhostに依存しないPWA構成に対応
+2. 解約日の「翌月同日まで有効」を維持
+   ※翌月に同じ日がない場合（1/31→2月など）は、その月の末日まで
+3. バックアップ書き出し／復元ボタンを追加
+4. 契約開始月の判定をstartYm基準に改善
+5. GitHub PagesなどHTTPS上に置けば、ホーム画面から単独起動＋オフライン起動可能
+
+大事
+- Koderのlocalhostと、GitHub Pagesなどの公開URLではlocalStorageが別です。
+- 既存データを移す場合：
+  ① まずこの新しいindex.htmlをKoderで開く
+  ② 「バックアップを書き出す」でJSONを保存
+  ③ GitHub Pages版をSafariで開く
+  ④ 「バックアップから復元」でJSONを読み込む

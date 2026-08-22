@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f6f3ee">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="サブスク管理">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<title>サブスク管理 | スタジオ予約枠トラッカー</title>
+<style>
+  :root{
+    --ink:#171512;
+    --paper:#f6f3ee;
+    --line:rgba(23,21,18,0.10);
+    --line-strong:rgba(23,21,18,0.18);
+    --room-a:#8a6d4f;
+    --room-b:#d9730d;
+    --room-c:#6b9c3d;
+    --green:#2f7a4f;
+    --green-bg:#e5f2e9;
+    --yellow:#8a6d12;
+    --yellow-bg:#faf1d6;
+    --red:#a8362a;
+    --red-bg:#fbe6e2;
+    --purple:#5b3b8a;
+    --purple-bg:#efe6f8;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; background:var(--paper); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  body{
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:calc(env(safe-area-inset-bottom) + 16px);
+  }
+  .wrap{max-width:520px; margin:0 auto; padding:0 16px;}
+
+  header{padding:22px 16px 10px;}
+  .eyebrow{
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:rgba(23,21,18,0.5); font-weight:600; margin-bottom:4px;
+  }
+  h1{
+    font-size:26px; margin:0; font-weight:800; letter-spacing:-0.01em;
+    font-family:Georgia,"Hiragino Mincho ProN",serif;
+  }
+  .month-nav{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:16px; padding:10px 14px; background:#fff;
+    border:1px solid var(--line-strong); border-radius:14px;
+  }
+  .month-nav button{
+    border:none; background:none; font-size:20px; color:var(--ink);
+    width:36px; height:36px; border-radius:10px; cursor:pointer;
+  }
+  .month-nav button:active{background:var(--line);}
+  .month-label{font-size:16px; font-weight:700; font-variant-numeric:tabular-nums;}
+  .month-sub{font-size:11px; color:rgba(23,21,18,0.5); text-align:center; margin-top:2px;}
+
+  .overall{
+    margin-top:14px; padding:14px 16px; border-radius:14px;
+    background:#fff; border:1px solid var(--line-strong);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .overall .label{font-size:12px; color:rgba(23,21,18,0.55); font-weight:600;}
+  .overall .value{font-size:22px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .overall .value span{font-size:13px; font-weight:600; color:rgba(23,21,18,0.5);}
+
+  .memo-card{
+    margin-top:14px; padding:14px 16px; border-radius:14px;
+    background:#fff; border:1px solid var(--line-strong);
+  }
+  .memo-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+  .memo-label{font-size:12px; font-weight:700; color:rgba(23,21,18,0.55);}
+  .memo-saved{font-size:11px; color:rgba(23,21,18,0.35); font-weight:600; opacity:0; transition:opacity .3s ease;}
+  .memo-saved.show{opacity:1;}
+  .memo-box{
+    width:100%; min-height:70px; border:1.5px solid var(--line-strong); border-radius:10px;
+    padding:10px 12px; font-size:14px; font-family:inherit; color:var(--ink);
+    background:var(--paper); resize:vertical; line-height:1.5;
+  }
+  .memo-box:focus{outline:none; border-color:var(--ink); background:#fff;}
+
+  .rooms{margin-top:18px; display:flex; flex-direction:column; gap:14px;}
+  .room-card{
+    background:#fff; border:1px solid var(--line-strong); border-radius:18px;
+    padding:16px; position:relative; overflow:hidden;
+  }
+  .room-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .room-id{display:flex; align-items:center; gap:10px;}
+  .room-badge{
+    width:38px; height:38px; border-radius:11px; display:flex; align-items:center;
+    justify-content:center; font-family:Georgia,serif; font-weight:800; font-size:18px;
+    color:#fff; flex-shrink:0;
+  }
+  .room-name{font-size:15px; font-weight:700;}
+  .room-hours{font-size:12px; color:rgba(23,21,18,0.55); font-variant-numeric:tabular-nums;}
+  .pct-pill{
+    padding:5px 12px; border-radius:999px; font-size:15px; font-weight:800;
+    font-variant-numeric:tabular-nums; flex-shrink:0;
+  }
+  .bar-track{
+    margin-top:12px; height:10px; border-radius:999px; background:#efece5;
+    overflow:hidden; position:relative;
+  }
+  .bar-fill{height:100%; border-radius:999px; transition:width .3s ease;}
+
+  .add-row{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;}
+  .plan-btn{
+    flex:1 1 auto; min-width:56px; padding:10px 0; border-radius:11px;
+    border:1px solid var(--line-strong); background:var(--paper);
+    font-size:14px; font-weight:700; color:var(--ink); cursor:pointer;
+    font-variant-numeric:tabular-nums;
+  }
+  .plan-btn:active{transform:scale(0.96); background:#fff;}
+
+  .entries{margin-top:12px;}
+  .entries-toggle{
+    font-size:12px; color:rgba(23,21,18,0.5); font-weight:600; cursor:pointer;
+    display:flex; align-items:center; gap:4px; padding:4px 0;
+  }
+  .entry-list{margin-top:8px; display:flex; flex-direction:column; gap:6px;}
+  .entry-list.hidden{display:none;}
+  .entry{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:9px 12px; background:var(--paper); border-radius:10px; font-size:13px;
+  }
+  .entry.is-cancelled{opacity:.6;}
+  .entry .who{font-weight:700;}
+  .entry .who.strike{text-decoration:line-through; text-decoration-color:rgba(23,21,18,0.4);}
+  .entry .meta{color:rgba(23,21,18,0.5); font-size:11.5px; margin-left:6px; font-weight:500;}
+  .entry .status{display:block; font-size:11px; margin-top:2px; font-weight:700;}
+  .entry .status.active{color:var(--green);}
+  .entry .status.cancelled{color:rgba(23,21,18,0.45);}
+  .entry .dates{
+    display:block; font-size:10.5px; margin-top:3px; color:rgba(23,21,18,0.4);
+    font-weight:500; line-height:1.5; font-variant-numeric:tabular-nums;
+  }
+  .entry-actions{display:flex; align-items:center; gap:4px; flex-shrink:0;}
+  .entry .cancel-btn{
+    border:1px solid var(--line-strong); background:#fff; color:var(--ink);
+    font-size:11px; font-weight:700; padding:6px 10px; border-radius:8px; cursor:pointer;
+    white-space:nowrap;
+  }
+  .entry .cancel-btn.undo{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .empty-note{font-size:12px; color:rgba(23,21,18,0.4); padding:6px 2px;}
+
+  .legend{
+    margin-top:18px; padding:14px 16px; border-radius:14px; background:#fff;
+    border:1px solid var(--line-strong);
+  }
+  .legend-title{font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:700; color:rgba(23,21,18,0.45); margin-bottom:10px;}
+  .legend-row{display:flex; align-items:center; gap:8px; font-size:12.5px; padding:3px 0; font-weight:600;}
+  .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+
+  .data-tools{
+    margin-top:14px; padding:14px 16px; border-radius:14px; background:#fff;
+    border:1px solid var(--line-strong);
+  }
+  .data-tools-title{font-size:12px; font-weight:800; margin-bottom:6px;}
+  .data-tools-note{font-size:11px; color:rgba(23,21,18,.5); line-height:1.5; margin-bottom:10px;}
+  .data-tools-row{display:flex; gap:8px;}
+  .data-btn{
+    flex:1; border:1px solid var(--line-strong); background:var(--paper); color:var(--ink);
+    padding:10px 8px; border-radius:10px; font-size:12px; font-weight:700; cursor:pointer;
+  }
+
+  footer{text-align:center; font-size:11px; color:rgba(23,21,18,0.35); padding:20px 16px 6px; line-height:1.8;}
+  .reset-link{color:rgba(168,54,42,0.6); font-weight:700; text-decoration:underline; cursor:pointer;}
+
+  .overlay{
+    position:fixed; inset:0; background:rgba(23,21,18,0.45); display:flex;
+    align-items:flex-end; justify-content:center; z-index:50; opacity:0; pointer-events:none;
+    transition:opacity .2s ease;
+  }
+  .overlay.show{opacity:1; pointer-events:auto;}
+  .sheet{
+    background:#fff; width:100%; max-width:520px; border-radius:22px 22px 0 0;
+    padding:20px 20px calc(20px + env(safe-area-inset-bottom));
+    transform:translateY(30px); transition:transform .25s ease;
+  }
+  .overlay.show .sheet{transform:translateY(0);}
+  .sheet-handle{width:36px; height:4px; background:var(--line-strong); border-radius:99px; margin:0 auto 16px;}
+  .sheet h2{margin:0 0 4px; font-size:18px; font-weight:800;}
+  .sheet .room-tag{
+    display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700;
+    color:rgba(23,21,18,0.55); margin-bottom:16px;
+  }
+  .room-dot{width:8px; height:8px; border-radius:50%;}
+  .field-label{font-size:12px; font-weight:700; color:rgba(23,21,18,0.55); margin:14px 0 8px;}
+  .hour-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+  .hour-opt{
+    padding:14px 0; border-radius:12px; border:1.5px solid var(--line-strong);
+    background:var(--paper); font-size:16px; font-weight:800; text-align:center; cursor:pointer;
+    font-variant-numeric:tabular-nums;
+  }
+  .hour-opt.selected{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .name-input{
+    width:100%; padding:13px 14px; border-radius:12px; border:1.5px solid var(--line-strong);
+    font-size:16px; background:var(--paper); color:var(--ink); font-family:inherit;
+  }
+  .name-input:focus{outline:none; border-color:var(--ink); background:#fff;}
+  .sheet-actions{display:flex; gap:10px; margin-top:20px;}
+  .btn{
+    flex:1; padding:14px 0; border-radius:12px; border:none; font-size:15px;
+    font-weight:800; cursor:pointer; font-family:inherit;
+  }
+  .btn-cancel{background:var(--paper); color:var(--ink);}
+  .btn-confirm{background:var(--ink); color:#fff;}
+  .btn-confirm:disabled{opacity:.35;}
+  .btn-danger{background:var(--red); color:#fff;}
+  .btn:active{transform:scale(0.97);}
+
+  .toast{
+    position:fixed; bottom:calc(env(safe-area-inset-bottom) + 18px); left:50%;
+    transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff;
+    padding:11px 18px; border-radius:999px; font-size:13px; font-weight:700;
+    opacity:0; pointer-events:none; transition:all .25s ease; z-index:60; white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Studio Reservation Load</div>
+    <h1>サブスク管理</h1>
+    <div class="month-nav">
+      <button id="prevMonth" aria-label="前の月">‹</button>
+      <div style="text-align:center;">
+        <div class="month-label" id="monthLabel"></div>
+        <div class="month-sub" id="monthSub"></div>
+      </div>
+      <button id="nextMonth" aria-label="次の月">›</button>
+    </div>
+    <div class="overall">
+      <div>
+        <div class="label">3部屋 合計購入時間</div>
+        <div class="value" id="overallValue">0h <span>/ 540h</span></div>
+      </div>
+      <div class="pct-pill" id="overallPct">0%</div>
+    </div>
+    <div class="memo-card">
+      <div class="memo-head">
+        <div class="memo-label" id="memoLabel"></div>
+        <div class="memo-saved" id="memoSaved">保存済み</div>
+      </div>
+      <textarea class="memo-box" id="memoBox" placeholder="この月についてのメモ（連絡事項、注意点など）"></textarea>
+    </div>
+  </header>
+
+  <div class="wrap rooms" id="roomsContainer"></div>
+
+  <div class="legend">
+    <div class="legend-title">達成率カラー</div>
+    <div class="legend-row"><span class="dot" style="background:var(--green);"></span>〜29% 余裕あり</div>
+    <div class="legend-row"><span class="dot" style="background:var(--yellow);"></span>30〜45% 標準</div>
+    <div class="legend-row"><span class="dot" style="background:var(--red);"></span>46〜55% 混雑気味</div>
+    <div class="legend-row"><span class="dot" style="background:var(--purple);"></span>56%〜 満枠に接近</div>
+  </div>
+
+  <div class="data-tools">
+    <div class="data-tools-title">データのバックアップ</div>
+    <div class="data-tools-note">端末変更やSafariのデータ消去に備えて、ときどき保存しておくと安心です。</div>
+    <div class="data-tools-row">
+      <button class="data-btn" id="exportBtn">バックアップを書き出す</button>
+      <button class="data-btn" id="importBtn">バックアップから復元</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+  </div>
+
+  <footer>
+    各部屋 月上限180h ・ 解約するまで翌月へ自動継続 ・ データはこの端末に保存されます<br>
+    <span id="resetLink" class="reset-link">全データをリセットする</span>
+  </footer>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>サブスク契約を追加</h2>
+    <div class="room-tag"><span class="room-dot" id="sheetRoomDot"></span><span id="sheetRoomName">部屋A</span></div>
+    <div style="font-size:12px; color:rgba(23,21,18,0.5); margin-top:-10px; margin-bottom:4px;">解約するまで翌月以降も自動で継続カウントされます</div>
+
+    <div class="field-label">プラン(h)</div>
+    <div class="hour-grid" id="hourGrid"></div>
+
+    <div class="field-label">購入者名</div>
+    <input type="text" class="name-input" id="nameInput" placeholder="例）山田さん" maxlength="30">
+
+    <div class="sheet-actions">
+      <button class="btn btn-cancel" id="cancelBtn">キャンセル</button>
+      <button class="btn btn-confirm" id="confirmBtn" disabled>追加する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="overlay" id="cancelOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>解約の確認</h2>
+    <p id="cancelMessage" style="font-size:14px; color:rgba(23,21,18,0.65); line-height:1.6; margin:10px 0 0;"></p>
+    <div class="sheet-actions">
+      <button class="btn btn-cancel" id="cancelDismissBtn">キャンセル</button>
+      <button class="btn btn-danger" id="cancelConfirmBtn">解約する</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="resetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>全データをリセット</h2>
+    <p style="font-size:14px; color:rgba(23,21,18,0.65); line-height:1.6; margin:10px 0 0;">
+      すべての契約データとメモを完全に削除します。この操作は取り消せません。本当にリセットしますか？
+    </p>
+    <div class="sheet-actions">
+      <button class="btn btn-cancel" id="resetDismissBtn">キャンセル</button>
+      <button class="btn btn-danger" id="resetConfirmBtn">リセットする</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const ROOMS = [
+    {id:'A', name:'部屋A', color:'var(--room-a)'},
+    {id:'B', name:'部屋B', color:'var(--room-b)'},
+    {id:'C', name:'部屋C', color:'var(--room-c)'}
+  ];
+  const PLANS = [5,10,12,16];
+  const CAP = 180;
+  const STORAGE_KEY = 'purchases:v1';
+  const MEMO_KEY = 'memos:v1';
+
+  let allEntries = [];
+  let memos = {};
+  let curDate = new Date();
+  let curYM = ymKey(curDate);
+  let openRoom = null;
+  let selectedHours = null;
+  let expanded = {A:false,B:false,C:false};
+
+  function ymKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+  function ymLabel(ym){
+    const [y,m] = ym.split('-');
+    return y+'年'+parseInt(m,10)+'月';
+  }
+  function isCurrentMonth(ym){ return ym === ymKey(new Date()); }
+
+  function formatDateTime(ts){
+    if(!ts) return '';
+    const d = new Date(ts);
+    const y = d.getFullYear();
+    const m = d.getMonth()+1;
+    const day = d.getDate();
+    const hh = String(d.getHours()).padStart(2,'0');
+    const mm = String(d.getMinutes()).padStart(2,'0');
+    return `${y}/${m}/${day} ${hh}:${mm}`;
+  }
+
+  // 「解約した日の翌月の同日まで有効」。
+  // 翌月に同じ日が存在しない場合（例: 1/31→2月）は、その月の末日まで。
+  function nextMonthSameDay(date){
+    const d = new Date(date);
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const day = d.getDate();
+    const targetLastDay = new Date(y, m + 2, 0).getDate();
+    return new Date(
+      y, m + 1, Math.min(day, targetLastDay),
+      d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds()
+    );
+  }
+
+  function monthRangeForYm(ym){
+    const [y,m] = ym.split('-').map(Number);
+    const first = new Date(y, m-1, 1, 0,0,0,0);
+    const last = new Date(y, m, 0, 23,59,59,999);
+    return [first, last];
+  }
+
+  function formatDateOnly(ts){
+    if(!ts) return '';
+    const d = new Date(ts);
+    return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+  }
+
+  function isActiveInMonth(sub, ym){
+    const [monthStart, monthEnd] = monthRangeForYm(ym);
+
+    // 月単位の開始判定は startYm を優先。
+    if(sub.startYm){
+      const [sy,sm] = sub.startYm.split('-').map(Number);
+      const startMonth = new Date(sy, sm-1, 1);
+      if(startMonth > monthEnd) return false;
+    }else{
+      const start = new Date(sub.ts);
+      if(start > monthEnd) return false;
+    }
+
+    if(sub.cancelledTs){
+      const validUntil = nextMonthSameDay(new Date(sub.cancelledTs));
+      if(validUntil < monthStart) return false;
+    }
+    return true;
+  }
+
+  function migrate(raw){
+    return raw.map(e=>{
+      let out = e;
+      if(!e.startYm){
+        out = { id:e.id, room:e.room, hours:e.hours, name:e.name,
+                startYm:e.ym, cancelledYm:e.ym, ts:e.ts };
+      }
+      if(out.cancelledYm && !out.cancelledTs){
+        const [,end] = monthRangeForYm(out.cancelledYm);
+        out = { ...out, cancelledTs:end.getTime() };
+      }
+      return out;
+    });
+  }
+
+  function pctColor(pct){
+    if(pct < 30) return {c:'var(--green)', bg:'var(--green-bg)'};
+    if(pct <= 45) return {c:'var(--yellow)', bg:'var(--yellow-bg)'};
+    if(pct <= 55) return {c:'var(--red)', bg:'var(--red-bg)'};
+    return {c:'var(--purple)', bg:'var(--purple-bg)'};
+  }
+
+  function loadData(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      allEntries = raw ? migrate(JSON.parse(raw)) : [];
+    }catch(e){ allEntries = []; }
+
+    try{
+      const rawMemo = localStorage.getItem(MEMO_KEY);
+      memos = rawMemo ? JSON.parse(rawMemo) : {};
+    }catch(e){ memos = {}; }
+
+    render();
+  }
+
+  function saveData(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(allEntries));
+      return true;
+    }catch(e){
+      showToast('保存に失敗しました');
+      return false;
+    }
+  }
+
+  function saveMemos(){
+    try{
+      localStorage.setItem(MEMO_KEY, JSON.stringify(memos));
+      return true;
+    }catch(e){
+      showToast('メモの保存に失敗しました');
+      return false;
+    }
+  }
+
+  function entriesFor(roomId, ym){
+    return allEntries.filter(e => e.room === roomId && isActiveInMonth(e, ym));
+  }
+
+  function totalHours(roomId, ym){
+    return entriesFor(roomId, ym).reduce((s,e)=>s+e.hours,0);
+  }
+
+  function render(){
+    document.getElementById('monthLabel').textContent = ymLabel(curYM);
+    document.getElementById('monthSub').textContent = isCurrentMonth(curYM) ? '今月分' : '';
+    document.getElementById('memoLabel').textContent = ymLabel(curYM) + 'のメモ';
+    const memoBox = document.getElementById('memoBox');
+    if(document.activeElement !== memoBox) memoBox.value = memos[curYM] || '';
+
+    let grandTotal = 0;
+    const container = document.getElementById('roomsContainer');
+    container.innerHTML = '';
+
+    ROOMS.forEach(room=>{
+      const total = totalHours(room.id, curYM);
+      grandTotal += total;
+      const pct = Math.round((total/CAP)*1000)/10;
+      const col = pctColor(pct);
+      const list = entriesFor(room.id, curYM).sort((a,b)=>b.ts-a.ts);
+
+      const card = document.createElement('div');
+      card.className = 'room-card';
+      card.innerHTML = `
+        <div class="room-top">
+          <div class="room-id">
+            <div class="room-badge" style="background:${room.color};">${room.id}</div>
+            <div>
+              <div class="room-name">${room.name}</div>
+              <div class="room-hours">${total}h / ${CAP}h 購入済み</div>
+            </div>
+          </div>
+          <div class="pct-pill" style="color:${col.c}; background:${col.bg};">${pct}%</div>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${Math.min(pct,100)}%; background:${col.c};"></div>
+        </div>
+        <div class="add-row">
+          ${PLANS.map(h=>`<button class="plan-btn" data-room="${room.id}" data-hours="${h}">${h}h</button>`).join('')}
+        </div>
+        <div class="entries">
+          <div class="entries-toggle" data-room="${room.id}">${expanded[room.id] ? '▾' : '▸'} 契約一覧（${list.length}件）</div>
+          <div class="entry-list ${expanded[room.id] ? '' : 'hidden'}">
+            ${list.length === 0 ? '<div class="empty-note">この月の契約はありません</div>' :
+              list.map(e=>{
+                const cancelled = !!e.cancelledTs;
+                const validUntil = cancelled ? nextMonthSameDay(new Date(e.cancelledTs)) : null;
+                const statusText = cancelled
+                  ? `解約済み（${formatDateOnly(validUntil.getTime())}まで有効）`
+                  : '契約中・自動継続';
+                return `
+                <div class="entry ${cancelled ? 'is-cancelled' : ''}" data-id="${e.id}">
+                  <div>
+                    <span class="who ${cancelled ? 'strike' : ''}">${escapeHtml(e.name || '名前未記入')}</span><span class="meta">${e.hours}h</span>
+                    <span class="status ${cancelled ? 'cancelled' : 'active'}">${statusText}</span>
+                    <span class="dates">購入: ${formatDateTime(e.ts) || '不明'}${cancelled ? `<br>解約: ${formatDateTime(e.cancelledTs) || '不明'}` : ''}</span>
+                  </div>
+                  <div class="entry-actions">
+                    <button class="cancel-btn ${cancelled ? 'undo' : ''}" data-id="${e.id}">${cancelled ? '取消' : '解約'}</button>
+                  </div>
+                </div>`;
+              }).join('')
+            }
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+
+    const overallPct = Math.round((grandTotal/(CAP*3))*1000)/10;
+    document.getElementById('overallValue').innerHTML = grandTotal + 'h <span>/ ' + (CAP*3) + 'h</span>';
+    const ocol = pctColor(overallPct);
+    const opill = document.getElementById('overallPct');
+    opill.textContent = overallPct + '%';
+    opill.style.color = ocol.c;
+    opill.style.background = ocol.bg;
+
+    container.querySelectorAll('.plan-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=> openSheet(btn.dataset.room, parseInt(btn.dataset.hours,10)));
+    });
+
+    container.querySelectorAll('.entries-toggle').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const r = el.dataset.room;
+        expanded[r] = !expanded[r];
+        render();
+      });
+    });
+
+    container.querySelectorAll('.cancel-btn').forEach(btn=>{
+      btn.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        const entry = allEntries.find(e=>e.id===btn.dataset.id);
+        if(!entry) return;
+
+        if(entry.cancelledTs){
+          entry.cancelledYm = null;
+          entry.cancelledTs = null;
+          saveData();
+          render();
+          showToast('解約を取り消しました');
+        }else{
+          openCancelConfirm(entry);
+        }
+      });
+    });
+  }
+
+  let pendingCancelId = null;
+
+  function openCancelConfirm(entry){
+    pendingCancelId = entry.id;
+    const room = ROOMS.find(r=>r.id===entry.room);
+    const validUntil = formatDateOnly(nextMonthSameDay(new Date()).getTime());
+    document.getElementById('cancelMessage').textContent =
+      `${entry.name || '名前未記入'}さんの${room.name}（${entry.hours}h）を今日付けで解約しますか？解約後は${validUntil}まで有効です。`;
+    document.getElementById('cancelOverlay').classList.add('show');
+  }
+
+  function closeCancelConfirm(){
+    pendingCancelId = null;
+    document.getElementById('cancelOverlay').classList.remove('show');
+  }
+
+  document.getElementById('cancelDismissBtn').addEventListener('click', closeCancelConfirm);
+  document.getElementById('cancelOverlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'cancelOverlay') closeCancelConfirm();
+  });
+
+  document.getElementById('cancelConfirmBtn').addEventListener('click', ()=>{
+    const entry = allEntries.find(e=>e.id === pendingCancelId);
+    if(!entry){ closeCancelConfirm(); return; }
+    entry.cancelledYm = ymKey(new Date());
+    entry.cancelledTs = Date.now();
+    saveData();
+    closeCancelConfirm();
+    render();
+    showToast('解約として記録しました');
+  });
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function openSheet(roomId, hours){
+    openRoom = roomId;
+    selectedHours = hours || null;
+    const room = ROOMS.find(r=>r.id===roomId);
+    document.getElementById('sheetRoomName').textContent = room.name;
+    document.getElementById('sheetRoomDot').style.background = room.color;
+    document.getElementById('nameInput').value = '';
+
+    const grid = document.getElementById('hourGrid');
+    grid.innerHTML = PLANS.map(h=>`<div class="hour-opt ${h===selectedHours?'selected':''}" data-hours="${h}">${h}h</div>`).join('');
+    grid.querySelectorAll('.hour-opt').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        selectedHours = parseInt(el.dataset.hours,10);
+        grid.querySelectorAll('.hour-opt').forEach(o=>o.classList.remove('selected'));
+        el.classList.add('selected');
+        validateConfirm();
+      });
+    });
+    validateConfirm();
+    document.getElementById('overlay').classList.add('show');
+    setTimeout(()=>document.getElementById('nameInput').focus(), 250);
+  }
+
+  function closeSheet(){
+    document.getElementById('overlay').classList.remove('show');
+  }
+
+  function validateConfirm(){
+    document.getElementById('confirmBtn').disabled = !selectedHours;
+  }
+
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 1600);
+  }
+
+  document.getElementById('cancelBtn').addEventListener('click', closeSheet);
+  document.getElementById('overlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'overlay') closeSheet();
+  });
+
+  document.getElementById('confirmBtn').addEventListener('click', ()=>{
+    if(!selectedHours || !openRoom) return;
+    const entry = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+      room: openRoom,
+      hours: selectedHours,
+      name: document.getElementById('nameInput').value.trim(),
+      startYm: curYM,
+      cancelledYm: null,
+      ts: Date.now()
+    };
+    allEntries.push(entry);
+    saveData();
+    closeSheet();
+    render();
+    showToast(openRoom + '部屋に' + selectedHours + 'h追加しました');
+  });
+
+  document.getElementById('prevMonth').addEventListener('click', ()=>{
+    curDate.setMonth(curDate.getMonth()-1);
+    curYM = ymKey(curDate);
+    render();
+  });
+
+  document.getElementById('nextMonth').addEventListener('click', ()=>{
+    curDate.setMonth(curDate.getMonth()+1);
+    curYM = ymKey(curDate);
+    render();
+  });
+
+  let memoSaveTimer = null;
+  document.getElementById('memoBox').addEventListener('input', (e)=>{
+    const ym = curYM;
+    memos[ym] = e.target.value;
+    clearTimeout(memoSaveTimer);
+    memoSaveTimer = setTimeout(()=>{
+      if(saveMemos()){
+        const saved = document.getElementById('memoSaved');
+        saved.classList.add('show');
+        setTimeout(()=>saved.classList.remove('show'), 1200);
+      }
+    }, 500);
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const payload = {
+      app:'サブスク管理',
+      version:1,
+      exportedAt:new Date().toISOString(),
+      purchases:allEntries,
+      memos:memos
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    a.href = url;
+    a.download = `サブスク管理バックアップ_${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    showToast('バックアップを書き出しました');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', ()=>{
+    document.getElementById('importFile').click();
+  });
+
+  document.getElementById('importFile').addEventListener('change', async (e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    try{
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if(!Array.isArray(data.purchases) || !data.memos || typeof data.memos !== 'object'){
+        throw new Error('invalid backup');
+      }
+      if(!confirm('現在のデータをバックアップ内容で置き換えます。よろしいですか？')) return;
+      allEntries = migrate(data.purchases);
+      memos = data.memos;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(allEntries));
+      localStorage.setItem(MEMO_KEY, JSON.stringify(memos));
+      curDate = new Date();
+      curYM = ymKey(curDate);
+      render();
+      showToast('バックアップを復元しました');
+    }catch(err){
+      showToast('バックアップを読み込めませんでした');
+    }finally{
+      e.target.value = '';
+    }
+  });
+
+  document.getElementById('resetLink').addEventListener('click', ()=>{
+    document.getElementById('resetOverlay').classList.add('show');
+  });
+  document.getElementById('resetDismissBtn').addEventListener('click', ()=>{
+    document.getElementById('resetOverlay').classList.remove('show');
+  });
+  document.getElementById('resetOverlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'resetOverlay') document.getElementById('resetOverlay').classList.remove('show');
+  });
+  document.getElementById('resetConfirmBtn').addEventListener('click', ()=>{
+    allEntries = [];
+    memos = {};
+    try{
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(MEMO_KEY);
+    }catch(err){}
+    document.getElementById('resetOverlay').classList.remove('show');
+    curDate = new Date();
+    curYM = ymKey(curDate);
+    render();
+    showToast('全データをリセットしました');
+  });
+
+  if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+    });
+  }
+
+  loadData();
+})();
+</script>
+</body>
+</html>
