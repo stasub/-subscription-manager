@@ -142,11 +142,12 @@
     font-weight:500; line-height:1.5; font-variant-numeric:tabular-nums;
   }
   .entry-actions{display:flex; align-items:center; gap:4px; flex-shrink:0;}
-  .entry .cancel-btn{
+  .entry .cancel-btn, .entry .edit-btn{
     border:1px solid var(--line-strong); background:#fff; color:var(--ink);
     font-size:11px; font-weight:700; padding:6px 10px; border-radius:8px; cursor:pointer;
     white-space:nowrap;
   }
+  .entry .edit-btn{background:var(--paper);}
   .entry .cancel-btn.undo{background:var(--ink); color:#fff; border-color:var(--ink);}
   .empty-note{font-size:12px; color:rgba(23,21,18,0.4); padding:6px 2px;}
 
@@ -193,6 +194,12 @@
   }
   .room-dot{width:8px; height:8px; border-radius:50%;}
   .field-label{font-size:12px; font-weight:700; color:rgba(23,21,18,0.55); margin:14px 0 8px;}
+  .room-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .room-opt{
+    padding:12px 0; border-radius:12px; border:1.5px solid var(--line-strong);
+    background:var(--paper); font-size:14px; font-weight:800; text-align:center; cursor:pointer;
+  }
+  .room-opt.selected{background:var(--ink); color:#fff; border-color:var(--ink);}
   .hour-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
   .hour-opt{
     padding:14px 0; border-radius:12px; border:1.5px solid var(--line-strong);
@@ -301,6 +308,28 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="overlay" id="editOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>契約内容を編集</h2>
+    <div style="font-size:12px; color:rgba(23,21,18,0.5); margin:2px 0 4px;">登録済みの名前・部屋・プランを修正できます</div>
+
+    <div class="field-label">部屋</div>
+    <div class="room-grid" id="editRoomGrid"></div>
+
+    <div class="field-label">プラン(h)</div>
+    <div class="hour-grid" id="editHourGrid"></div>
+
+    <div class="field-label">購入者名</div>
+    <input type="text" class="name-input" id="editNameInput" placeholder="例）山田さん" maxlength="30">
+
+    <div class="sheet-actions">
+      <button class="btn btn-cancel" id="editCancelBtn">キャンセル</button>
+      <button class="btn btn-confirm" id="editSaveBtn">保存する</button>
+    </div>
+  </div>
+</div>
 
 <div class="overlay" id="cancelOverlay">
   <div class="sheet">
@@ -532,6 +561,7 @@
                     <span class="dates">購入: ${formatDateTime(e.ts) || '不明'}${cancelled ? `<br>解約: ${formatDateTime(e.cancelledTs) || '不明'}` : ''}</span>
                   </div>
                   <div class="entry-actions">
+                    <button class="edit-btn" data-id="${e.id}">編集</button>
                     <button class="cancel-btn ${cancelled ? 'undo' : ''}" data-id="${e.id}">${cancelled ? '取消' : '解約'}</button>
                   </div>
                 </div>`;
@@ -563,6 +593,14 @@
       });
     });
 
+    container.querySelectorAll('.edit-btn').forEach(btn=>{
+      btn.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        const entry = allEntries.find(e=>e.id===btn.dataset.id);
+        if(entry) openEditSheet(entry);
+      });
+    });
+
     container.querySelectorAll('.cancel-btn').forEach(btn=>{
       btn.addEventListener('click', (ev)=>{
         ev.stopPropagation();
@@ -581,6 +619,63 @@
       });
     });
   }
+
+  let editingEntryId = null;
+  let editRoom = null;
+  let editHours = null;
+
+  function openEditSheet(entry){
+    editingEntryId = entry.id;
+    editRoom = entry.room;
+    editHours = entry.hours;
+    document.getElementById('editNameInput').value = entry.name || '';
+
+    const roomGrid = document.getElementById('editRoomGrid');
+    roomGrid.innerHTML = ROOMS.map(r=>`<div class="room-opt ${r.id===editRoom?'selected':''}" data-room="${r.id}">${r.name}</div>`).join('');
+    roomGrid.querySelectorAll('.room-opt').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        editRoom = el.dataset.room;
+        roomGrid.querySelectorAll('.room-opt').forEach(o=>o.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+    });
+
+    const hourGrid = document.getElementById('editHourGrid');
+    hourGrid.innerHTML = PLANS.map(h=>`<div class="hour-opt ${h===editHours?'selected':''}" data-hours="${h}">${h}h</div>`).join('');
+    hourGrid.querySelectorAll('.hour-opt').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        editHours = parseInt(el.dataset.hours,10);
+        hourGrid.querySelectorAll('.hour-opt').forEach(o=>o.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+    });
+
+    document.getElementById('editOverlay').classList.add('show');
+    setTimeout(()=>document.getElementById('editNameInput').focus(), 250);
+  }
+
+  function closeEditSheet(){
+    editingEntryId = null;
+    editRoom = null;
+    editHours = null;
+    document.getElementById('editOverlay').classList.remove('show');
+  }
+
+  document.getElementById('editCancelBtn').addEventListener('click', closeEditSheet);
+  document.getElementById('editOverlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'editOverlay') closeEditSheet();
+  });
+  document.getElementById('editSaveBtn').addEventListener('click', ()=>{
+    const entry = allEntries.find(e=>e.id===editingEntryId);
+    if(!entry || !editRoom || !editHours){ closeEditSheet(); return; }
+    entry.room = editRoom;
+    entry.hours = editHours;
+    entry.name = document.getElementById('editNameInput').value.trim();
+    saveData();
+    closeEditSheet();
+    render();
+    showToast('契約内容を修正しました');
+  });
 
   let pendingCancelId = null;
 
