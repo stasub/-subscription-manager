@@ -131,23 +131,27 @@
     padding:9px 12px; background:var(--paper); border-radius:10px; font-size:13px;
   }
   .entry.is-cancelled{opacity:.6;}
+  .entry.is-consumed{opacity:.68;}
   .entry .who{font-weight:700;}
   .entry .who.strike{text-decoration:line-through; text-decoration-color:rgba(23,21,18,0.4);}
   .entry .meta{color:rgba(23,21,18,0.5); font-size:11.5px; margin-left:6px; font-weight:500;}
   .entry .status{display:block; font-size:11px; margin-top:2px; font-weight:700;}
   .entry .status.active{color:var(--green);}
   .entry .status.cancelled{color:rgba(23,21,18,0.45);}
+  .entry .status.consumed{color:var(--purple);}
   .entry .dates{
     display:block; font-size:10.5px; margin-top:3px; color:rgba(23,21,18,0.4);
     font-weight:500; line-height:1.5; font-variant-numeric:tabular-nums;
   }
-  .entry-actions{display:flex; align-items:center; gap:4px; flex-shrink:0;}
-  .entry .cancel-btn, .entry .edit-btn{
+  .entry-actions{display:flex; align-items:center; justify-content:flex-end; gap:4px; flex-shrink:0; flex-wrap:wrap;}
+  .entry .cancel-btn, .entry .edit-btn, .entry .consume-btn{
     border:1px solid var(--line-strong); background:#fff; color:var(--ink);
     font-size:11px; font-weight:700; padding:6px 10px; border-radius:8px; cursor:pointer;
     white-space:nowrap;
   }
   .entry .edit-btn{background:var(--paper);}
+  .entry .consume-btn{background:var(--yellow-bg); color:var(--yellow);}
+  .entry .consume-btn.undo{background:var(--purple); color:#fff; border-color:var(--purple);}
   .entry .cancel-btn.undo{background:var(--ink); color:#fff; border-color:var(--ink);}
   .empty-note{font-size:12px; color:rgba(23,21,18,0.4); padding:6px 2px;}
 
@@ -282,7 +286,7 @@
   </div>
 
   <footer>
-    各部屋 月上限180h ・ 解約するまで翌月へ自動継続 ・ データはこの端末に保存されます<br>
+    各部屋 月上限180h ・ 解約するまで翌月へ自動継続 ・ 「消化」で購入時間の計算から除外 ・ データはこの端末に保存されます<br>
     <span id="resetLink" class="reset-link">全データをリセットする</span>
   </footer>
 </div>
@@ -439,7 +443,21 @@
       const validUntil = nextMonthSameDay(new Date(sub.cancelledTs));
       if(validUntil < monthStart) return false;
     }
+
+    // 消化済みになった契約は、消化した月までは履歴として表示し、翌月以降は表示しない。
+    if(sub.consumedTs){
+      const consumed = new Date(sub.consumedTs);
+      const consumedMonthStart = new Date(consumed.getFullYear(), consumed.getMonth(), 1);
+      if(consumedMonthStart < monthStart) return false;
+    }
     return true;
+  }
+
+  // 消化済みになった月以降は、購入時間・％の計算対象から外す。
+  function isConsumedInMonth(sub, ym){
+    if(!sub.consumedTs) return false;
+    const [,monthEnd] = monthRangeForYm(ym);
+    return new Date(sub.consumedTs) <= monthEnd;
   }
 
   function migrate(raw){
@@ -503,7 +521,9 @@
   }
 
   function totalHours(roomId, ym){
-    return entriesFor(roomId, ym).reduce((s,e)=>s+e.hours,0);
+    return entriesFor(roomId, ym)
+      .filter(e => !isConsumedInMonth(e, ym))
+      .reduce((s,e)=>s+e.hours,0);
   }
 
   function render(){
@@ -549,19 +569,26 @@
             ${list.length === 0 ? '<div class="empty-note">この月の契約はありません</div>' :
               list.map(e=>{
                 const cancelled = !!e.cancelledTs;
+                const consumed = isConsumedInMonth(e, curYM);
+                const everConsumed = !!e.consumedTs;
                 const validUntil = cancelled ? nextMonthSameDay(new Date(e.cancelledTs)) : null;
-                const statusText = cancelled
-                  ? `解約済み（${formatDateOnly(validUntil.getTime())}まで有効）`
-                  : '契約中・自動継続';
+                const statusText = consumed
+                  ? '消化済み（購入時間・％の計算対象外）'
+                  : cancelled
+                    ? `解約済み（${formatDateOnly(validUntil.getTime())}まで有効）`
+                    : '契約中・自動継続';
+                const statusClass = consumed ? 'consumed' : (cancelled ? 'cancelled' : 'active');
+                const entryClass = consumed ? 'is-consumed' : (cancelled ? 'is-cancelled' : '');
                 return `
-                <div class="entry ${cancelled ? 'is-cancelled' : ''}" data-id="${e.id}">
+                <div class="entry ${entryClass}" data-id="${e.id}">
                   <div>
-                    <span class="who ${cancelled ? 'strike' : ''}">${escapeHtml(e.name || '名前未記入')}</span><span class="meta">${e.hours}h</span>
-                    <span class="status ${cancelled ? 'cancelled' : 'active'}">${statusText}</span>
-                    <span class="dates">購入: ${formatDateTime(e.ts) || '不明'}${cancelled ? `<br>解約: ${formatDateTime(e.cancelledTs) || '不明'}` : ''}</span>
+                    <span class="who ${cancelled && !consumed ? 'strike' : ''}">${escapeHtml(e.name || '名前未記入')}</span><span class="meta">${e.hours}h</span>
+                    <span class="status ${statusClass}">${statusText}</span>
+                    <span class="dates">購入: ${formatDateTime(e.ts) || '不明'}${cancelled ? `<br>解約: ${formatDateTime(e.cancelledTs) || '不明'}` : ''}${everConsumed ? `<br>消化: ${formatDateTime(e.consumedTs) || '不明'}` : ''}</span>
                   </div>
                   <div class="entry-actions">
                     <button class="edit-btn" data-id="${e.id}">編集</button>
+                    <button class="consume-btn ${everConsumed ? 'undo' : ''}" data-id="${e.id}">${everConsumed ? '戻す' : '消化'}</button>
                     <button class="cancel-btn ${cancelled ? 'undo' : ''}" data-id="${e.id}">${cancelled ? '取消' : '解約'}</button>
                   </div>
                 </div>`;
@@ -598,6 +625,26 @@
         ev.stopPropagation();
         const entry = allEntries.find(e=>e.id===btn.dataset.id);
         if(entry) openEditSheet(entry);
+      });
+    });
+
+    container.querySelectorAll('.consume-btn').forEach(btn=>{
+      btn.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        const entry = allEntries.find(e=>e.id===btn.dataset.id);
+        if(!entry) return;
+
+        if(entry.consumedTs){
+          entry.consumedTs = null;
+          saveData();
+          render();
+          showToast('消化済みを取り消しました');
+        }else{
+          entry.consumedTs = Date.now();
+          saveData();
+          render();
+          showToast('消化済みにしました');
+        }
       });
     });
 
@@ -765,6 +812,7 @@
       name: document.getElementById('nameInput').value.trim(),
       startYm: curYM,
       cancelledYm: null,
+      consumedTs: null,
       ts: Date.now()
     };
     allEntries.push(entry);
